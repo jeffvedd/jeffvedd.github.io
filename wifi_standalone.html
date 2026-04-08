@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Wi-Fi Scope — Standalone</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #050a0e;
+    --panel:     #0a1520;
+    --border:    #0d3348;
+    --glow:      #00ffe7;
+    --glow2:     #00b4ff;
+    --warn:      #ff6b35;
+    --ok:        #39ff14;
+    --trace1:    #00ffe7;
+    --trace2:    #ff6b35;
+    --text:      #c8f0ff;
+    --dim:       #3a6070;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-disp: 'Orbitron', sans-serif;
+  }
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+  body::after {
+    content:'';
+    position:fixed; inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.18) 2px,rgba(0,0,0,0.18) 4px);
+    pointer-events:none;
+    z-index:9999;
+  }
+
+  /* ── Header ── */
+  header {
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding:10px 14px;
+    border-bottom:1px solid var(--border);
+    background:var(--panel);
+    flex-shrink:0;
+  }
+  .header-row1 {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .logo {
+    font-family:var(--font-disp);
+    font-size:clamp(15px,4vw,22px);
+    font-weight:900;
+    letter-spacing:3px;
+    color:var(--glow);
+    text-shadow:0 0 18px var(--glow),0 0 40px var(--glow2);
+    white-space:nowrap;
+  }
+  .logo span { color:var(--glow2); }
+
+  .badge {
+    font-family:var(--font-disp);
+    font-size:9px;
+    letter-spacing:2px;
+    padding:3px 8px;
+    border:1px solid var(--glow2);
+    color:var(--glow2);
+    border-radius:3px;
+    text-shadow:0 0 8px var(--glow2);
+  }
+
+  .status-bar { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); }
+  #conn-dot {
+    width:9px; height:9px; border-radius:50%;
+    background:var(--dim); transition:all .3s; flex-shrink:0;
+  }
+  #conn-dot.connected { background:var(--ok); box-shadow:0 0 10px var(--ok); animation:pulse 1.4s infinite; }
+  #conn-dot.warn      { background:var(--warn); box-shadow:0 0 10px var(--warn); }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.45} }
+
+  .header-row2 {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+  #net-info {
+    font-size:11px;
+    color:var(--glow2);
+    letter-spacing:1px;
+    flex:1;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  #btn-start {
+    font-family:var(--font-disp);
+    font-size:11px;
+    letter-spacing:2px;
+    padding:7px 18px;
+    background:transparent;
+    border:1px solid var(--glow);
+    color:var(--glow);
+    cursor:pointer;
+    border-radius:4px;
+    transition:all .2s;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  #btn-start:hover,#btn-start:active { background:var(--glow); color:var(--bg); box-shadow:0 0 20px var(--glow); }
+
+  /* ── Main ── */
+  main {
+    flex:1;
+    display:grid;
+    grid-template-rows:1fr auto;
+    padding:12px;
+    gap:12px;
+  }
+
+  /* ── Scope ── */
+  .scope-wrap {
+    position:relative;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:#020c11;
+    overflow:hidden;
+    box-shadow:0 0 30px rgba(0,255,231,0.06),inset 0 0 60px rgba(0,0,0,0.6);
+    min-height:220px;
+  }
+  .scope-wrap::before {
+    content:'';
+    position:absolute; inset:0;
+    background:radial-gradient(ellipse at 50% 50%,rgba(0,255,231,0.03) 0%,transparent 70%);
+    pointer-events:none;
+  }
+  #scope { display:block; width:100%; height:100%; }
+
+  /* ── Bottom ── */
+  .bottom {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+    gap:10px;
+  }
+  .card {
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:10px 14px;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .card-label { font-size:9px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; }
+  .card-value {
+    font-family:var(--font-disp);
+    font-size:clamp(16px,4vw,26px);
+    font-weight:700;
+    color:var(--glow);
+    text-shadow:0 0 12px var(--glow);
+    line-height:1;
+  }
+  .card-value.orange { color:var(--warn); text-shadow:0 0 12px var(--warn); }
+  .card-value.green  { color:var(--ok);   text-shadow:0 0 12px var(--ok); }
+  .card-value.red    { color:#ff3030;     text-shadow:0 0 12px #ff3030; }
+  .card-unit { font-size:10px; color:var(--dim); }
+
+  .quality-bar-wrap {
+    margin-top:4px; height:6px;
+    background:#0a1825; border-radius:3px;
+    overflow:hidden; border:1px solid var(--border);
+  }
+  #quality-bar {
+    height:100%; width:0%;
+    border-radius:3px;
+    transition:width .5s,background .5s;
+    background:var(--ok);
+  }
+
+  /* Mini speed bars */
+  .speed-bars {
+    display:flex; gap:3px; align-items:flex-end;
+    height:28px; margin-top:4px;
+  }
+  .speed-bar {
+    flex:1; border-radius:2px 2px 0 0;
+    background:var(--border);
+    transition:height .3s, background .3s;
+    min-height:3px;
+  }
+
+  /* LED indicators */
+  .led-row { display:flex; gap:10px; align-items:center; margin-top:4px; }
+  .led-ind  { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .led-bulb {
+    width:22px; height:22px; border-radius:50%;
+    background:#111; border:2px solid #1a3040; transition:all .15s;
+  }
+  .led-bulb.on-cyan   { background:var(--glow); border-color:var(--glow); box-shadow:0 0 12px var(--glow),0 0 30px var(--glow2); }
+  .led-bulb.on-orange { background:var(--warn); border-color:var(--warn); box-shadow:0 0 12px var(--warn),0 0 30px #ff4400; }
+  .led-name { font-size:9px; color:var(--dim); letter-spacing:1px; }
+
+  /* Controls */
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .ctrl-btn {
+    font-family:var(--font-mono); font-size:11px;
+    padding:5px 12px;
+    background:transparent; border:1px solid var(--border);
+    color:var(--dim); border-radius:3px; cursor:pointer;
+    transition:all .2s; letter-spacing:1px;
+  }
+  .ctrl-btn:hover  { border-color:var(--glow2); color:var(--glow2); }
+  .ctrl-btn.active { border-color:var(--glow); color:var(--glow); background:rgba(0,255,231,0.07); }
+  label.ctrl-label { font-size:10px; color:var(--dim); letter-spacing:1px; }
+  input[type=range] { accent-color:var(--glow); width:80px; }
+
+  /* Info banner */
+  .info-banner {
+    background:rgba(0,180,255,0.07);
+    border:1px solid rgba(0,180,255,0.2);
+    border-radius:4px;
+    padding:8px 12px;
+    font-size:10px;
+    color:var(--glow2);
+    line-height:1.6;
+    letter-spacing:.5px;
+  }
+  .info-banner b { color:var(--glow); }
+
+  @media(max-width:480px){
+    .bottom { grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row1">
+    <div class="logo">WI-FI<span>SCOPE</span></div>
+    <div class="badge">STANDALONE</div>
+  </div>
+  <div class="header-row2">
+    <div class="status-bar">
+      <div id="conn-dot"></div>
+      <span id="conn-label">AGUARDANDO</span>
+    </div>
+    <div id="net-info">–––</div>
+    <button id="btn-start" onclick="toggleScan()">▶ INICIAR</button>
+  </div>
+</header>
+
+<main>
+  <div class="scope-wrap" id="scope-wrap">
+    <canvas id="scope"></canvas>
+  </div>
+
+  <div class="bottom">
+
+    <!-- Latência (ping) -->
+    <div class="card">
+      <div class="card-label">Latência</div>
+      <div class="card-value" id="val-ping">––</div>
+      <div class="card-unit">ms (ping)</div>
+    </div>
+
+    <!-- Qualidade estimada -->
+    <div class="card">
+      <div class="card-label">Qualidade</div>
+      <div class="card-value green" id="val-quality">––</div>
+      <div class="card-unit">%
+        <div class="quality-bar-wrap"><div id="quality-bar"></div></div>
+      </div>
+    </div>
+
+    <!-- Tipo de conexão -->
+    <div class="card">
+      <div class="card-label">Tipo / Banda</div>
+      <div class="card-value orange" id="val-type">––</div>
+      <div class="card-unit" id="val-speed">––</div>
+    </div>
+
+    <!-- LEDs virtuais -->
+    <div class="card">
+      <div class="card-label">Sinal Visual</div>
+      <div class="led-row">
+        <div class="led-ind">
+          <div class="led-bulb" id="led6"></div>
+          <div class="led-name">BOM</div>
+        </div>
+        <div class="led-ind">
+          <div class="led-bulb" id="led8"></div>
+          <div class="led-name">FRACO</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="card" style="grid-column:span 2">
+      <div class="card-label">Controles</div>
+      <div class="controls">
+        <button class="ctrl-btn active" id="btn-scroll"  onclick="toggleMode('scroll')">SCROLL</button>
+        <button class="ctrl-btn"       id="btn-trigger" onclick="toggleMode('trigger')">TRIGGER</button>
+        <button class="ctrl-btn"       id="btn-freeze"  onclick="toggleFreeze()">❚❚ PAUSE</button>
+        <label class="ctrl-label">ZOOM
+          <input type="range" id="zoom" min="1" max="8" value="1" step="0.5"
+                 oninput="zoomLevel=+this.value">
+        </label>
+        <label class="ctrl-label">BRILHO
+          <input type="range" id="bright" min="0.3" max="1" value="0.85" step="0.05"
+                 oninput="traceAlpha=+this.value">
+        </label>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="info-banner" id="info-banner">
+        ℹ️ Toque em <b>▶ INICIAR</b> para começar a medir.<br>
+        O osciloscópio usa <b>latência de rede</b> e a <b>Network Information API</b> do Chrome para estimar a qualidade do sinal Wi-Fi em tempo real — sem hardware extra.
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════
+const BUF_SIZE  = 800;
+const HISTORY   = 400;
+const POLL_MS   = 500;
+// Endpoint leve para medir latência (ping HTTP)
+// Usamos o próprio GitHub Pages ou qualquer URL pequena
+const PING_URL  = 'https://www.gstatic.com/generate_204';
+
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let pingBuf    = new Float32Array(BUF_SIZE);  // latência ms → trace1
+let qualBuf    = new Float32Array(BUF_SIZE);  // qualidade 0-5 → trace2
+let head = 0, count = 0;
+
+let frozen     = false;
+let mode       = 'scroll';
+let zoomLevel  = 1;
+let traceAlpha = 0.85;
+let scanning   = false;
+let pollTimer  = null;
+let ledTimer   = null;
+
+// ══════════════════════════════════════════════════════
+//  NETWORK INFO API
+// ══════════════════════════════════════════════════════
+function getNetInfo() {
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!conn) return null;
+  return {
+    type:       conn.type         || '–',
+    effectType: conn.effectiveType|| '–',
+    downlink:   conn.downlink     || 0,
+    rtt:        conn.rtt          || 0,
+    saveData:   conn.saveData     || false,
+  };
+}
+
+function qualityFromNetInfo(info, pingMs) {
+  if (!info) {
+    // fallback: estima só pelo ping
+    if (pingMs <  60) return 95;
+    if (pingMs < 120) return 80;
+    if (pingMs < 250) return 60;
+    if (pingMs < 500) return 35;
+    return 15;
+  }
+  // effectiveType: 'slow-2g'=10, '2g'=25, '3g'=60, '4g'=90
+  const etMap = { 'slow-2g':10, '2g':25, '3g':60, '4g':90 };
+  let q = etMap[info.effectType] || 50;
+  // ajusta pelo ping real
+  if (pingMs > 0) {
+    const pingScore = Math.max(0, 100 - pingMs / 5);
+    q = Math.round(q * 0.5 + pingScore * 0.5);
+  }
+  return Math.min(100, Math.max(0, q));
+}
+
+// ══════════════════════════════════════════════════════
+//  PING
+// ══════════════════════════════════════════════════════
+async function measurePing() {
+  const t0 = performance.now();
+  try {
+    await fetch(PING_URL + '?r=' + Math.random(), {
+      method: 'HEAD',
+      cache:  'no-store',
+      signal: AbortSignal.timeout(3000),
+    });
+  } catch(_) {}
+  return Math.round(performance.now() - t0);
+}
+
+// ══════════════════════════════════════════════════════
+//  SCAN LOOP
+// ══════════════════════════════════════════════════════
+function toggleScan() {
+  if (scanning) stopScan();
+  else          startScan();
+}
+
+function startScan() {
+  scanning = true;
+  document.getElementById('btn-start').textContent = '■ PARAR';
+  setStatus('connected', 'MEDINDO...');
+  doMeasure();
+  pollTimer = setInterval(doMeasure, POLL_MS);
+
+  // Ouve mudanças de rede em tempo real
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn) conn.addEventListener('change', doMeasure);
+}
+
+function stopScan() {
+  scanning = false;
+  clearInterval(pollTimer);
+  clearInterval(ledTimer);
+  document.getElementById('btn-start').textContent = '▶ INICIAR';
+  setStatus('', 'PARADO');
+}
+
+async function doMeasure() {
+  const pingMs = await measurePing();
+  const info   = getNetInfo();
+  const q      = qualityFromNetInfo(info, pingMs);
+
+  // Converte qualidade 0-100 → tensão 0-5V (para o eixo do scope)
+  const v = (q / 100) * 5;
+  // Converte ping em tensão invertida (ping baixo = sinal alto)
+  const vPing = Math.max(0, Math.min(5, 5 - (pingMs / 600) * 5));
+
+  pushSample(vPing, v);
+  updateUI(pingMs, q, info);
+  updateLeds(q);
+}
+
+// ══════════════════════════════════════════════════════
+//  UI UPDATE
+// ══════════════════════════════════════════════════════
+function updateUI(pingMs, q, info) {
+  // Ping
+  const pingEl = document.getElementById('val-ping');
+  pingEl.textContent = pingMs;
+  pingEl.className = 'card-value ' + (pingMs < 80 ? 'green' : pingMs < 200 ? '' : 'red');
+
+  // Qualidade
+  const qEl = document.getElementById('val-quality');
+  qEl.textContent = q;
+  qEl.className = 'card-value ' + (q > 65 ? 'green' : q > 35 ? '' : 'red');
+
+  const bar = document.getElementById('quality-bar');
+  bar.style.width = q + '%';
+  bar.style.background = q > 65 ? 'var(--ok)' : q > 35 ? 'var(--warn)' : '#ff3030';
+
+  // Tipo / velocidade
+  if (info) {
+    document.getElementById('val-type').textContent  = (info.effectType || info.type).toUpperCase();
+    document.getElementById('val-speed').textContent = info.downlink ? info.downlink + ' Mbps down' : '––';
+    document.getElementById('net-info').textContent  =
+      `${info.effectType || info.type}  ·  RTT ${info.rtt}ms  ·  ↓${info.downlink}Mbps`;
+  } else {
+    document.getElementById('val-type').textContent  = 'WI-FI';
+    document.getElementById('val-speed').textContent = pingMs + 'ms ping';
+    document.getElementById('net-info').textContent  = `Ping: ${pingMs}ms`;
+  }
+
+  // Banner de status
+  let msg = '';
+  if      (q > 80) msg = '✅ Sinal <b>excelente</b> — ótima cobertura neste local.';
+  else if (q > 60) msg = '🟢 Sinal <b>bom</b> — conexão estável.';
+  else if (q > 35) msg = '🟡 Sinal <b>moderado</b> — pode haver lentidão.';
+  else             msg = '🔴 Sinal <b>fraco</b> — tente se aproximar do roteador.';
+  document.getElementById('info-banner').innerHTML = msg;
+}
+
+function updateLeds(q) {
+  clearInterval(ledTimer);
+  const interval = Math.round(100 + ((100 - q) / 100) * 700);
+  let s = false;
+  ledTimer = setInterval(() => {
+    s = !s;
+    const good = q > 50;
+    document.getElementById('led6').className = 'led-bulb ' + (good && s  ? 'on-cyan'   : '');
+    document.getElementById('led8').className = 'led-bulb ' + (!good && s ? 'on-orange' : '');
+  }, interval);
+}
+
+function setStatus(cls, label) {
+  document.getElementById('conn-dot').className    = cls;
+  document.getElementById('conn-label').textContent = label;
+}
+
+// ══════════════════════════════════════════════════════
+//  BUFFER
+// ══════════════════════════════════════════════════════
+function pushSample(vPing, vQual) {
+  pingBuf[head] = vPing;
+  qualBuf[head] = vQual;
+  head = (head + 1) % BUF_SIZE;
+  if (count < BUF_SIZE) count++;
+}
+
+// ══════════════════════════════════════════════════════
+//  CONTROLS
+// ══════════════════════════════════════════════════════
+function toggleFreeze() {
+  frozen = !frozen;
+  const b = document.getElementById('btn-freeze');
+  b.textContent = frozen ? '▶ RESUMIR' : '❚❚ PAUSE';
+  b.classList.toggle('active', frozen);
+}
+function toggleMode(m) {
+  mode = m;
+  document.getElementById('btn-scroll').classList.toggle('active',  m === 'scroll');
+  document.getElementById('btn-trigger').classList.toggle('active', m === 'trigger');
+}
+
+// ══════════════════════════════════════════════════════
+//  CANVAS
+// ══════════════════════════════════════════════════════
+const canvas = document.getElementById('scope');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  const w = document.getElementById('scope-wrap');
+  canvas.width  = w.clientWidth;
+  canvas.height = w.clientHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Demo loop enquanto não iniciou
+let demoT = 0;
+const demoTimer = setInterval(() => {
+  if (scanning) return;
+  demoT += POLL_MS;
+  const vPing = 2.5 + 2.2*Math.sin(2*Math.PI*demoT/5000) + .3*(Math.random()-.5);
+  const vQual = 2.5 + 1.8*Math.sin(2*Math.PI*demoT/3000 + 1) + .2*(Math.random()-.5);
+  pushSample(Math.max(0,Math.min(5,vPing)), Math.max(0,Math.min(5,vQual)));
+}, POLL_MS);
+
+function mapR(x,a,b,c,d){ return c+(x-a)*(d-c)/(b-a); }
+
+// ══════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════
+const C = {
+  bg:   '#020c11',
+  grid: 'rgba(0,255,231,0.07)',
+  axis: 'rgba(0,255,231,0.25)',
+  t1:   '#00ffe7',
+  t2:   '#ff6b35',
+  g1:   'rgba(0,255,231,0.18)',
+  g1b:  'rgba(0,255,231,0.45)',
+  g2b:  'rgba(255,107,53,0.45)',
+  text: 'rgba(0,255,231,0.6)',
+  trig: 'rgba(255,255,0,0.65)',
+};
+
+function render() {
+  requestAnimationFrame(render);
+  if (frozen) return;
+
+  const W = canvas.width, H = canvas.height;
+  const PL=46, PR=12, PT=28, PB=36;
+  const GW=W-PL-PR, GH=H-PT-PB;
+  if (GW<10||GH<10) return;
+
+  // BG
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  const vig=ctx.createRadialGradient(W/2,H/2,H*.1,W/2,H/2,H*.85);
+  vig.addColorStop(0,'transparent'); vig.addColorStop(1,'rgba(0,0,0,.5)');
+  ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+  // Grid
+  const COLS=10, ROWS=8;
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  for(let c=0;c<=COLS;c++){
+    const x=PL+(c/COLS)*GW;
+    ctx.beginPath(); ctx.moveTo(x,PT); ctx.lineTo(x,PT+GH); ctx.stroke();
+  }
+  for(let r=0;r<=ROWS;r++){
+    const y=PT+(r/ROWS)*GH;
+    ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+GW,y); ctx.stroke();
+  }
+  ctx.fillStyle='rgba(0,255,231,0.1)';
+  for(let c=0;c<=COLS*5;c++) for(let r=0;r<=ROWS*5;r++){
+    ctx.fillRect(PL+(c/(COLS*5))*GW-.5, PT+(r/(ROWS*5))*GH-.5, 1,1);
+  }
+
+  // Borda
+  ctx.strokeStyle=C.axis; ctx.lineWidth=1.5;
+  ctx.strokeRect(PL,PT,GW,GH);
+
+  // Y labels
+  ctx.fillStyle=C.text; ctx.font='10px "Share Tech Mono"'; ctx.textAlign='right';
+  const yLabels=['100%','75%','50%','25%','0%'];
+  for(let i=0;i<5;i++){
+    const y=PT+(i/4)*GH;
+    ctx.fillText(yLabels[i], PL-4, y+4);
+  }
+
+  // X labels
+  ctx.textAlign='center';
+  const vis=Math.min(count, Math.floor(HISTORY/zoomLevel));
+  for(let c=0;c<=COLS;c++){
+    const x=PL+(c/COLS)*GW;
+    const ms=Math.round((vis*c/COLS)*POLL_MS);
+    ctx.fillText(ms>999?(ms/1000).toFixed(1)+'s':ms+'ms', x, PT+GH+16);
+  }
+
+  if(vis<2) return;
+
+  // Samples
+  const samples=[];
+  for(let i=0;i<vis;i++){
+    const idx=(head-vis+i+BUF_SIZE)%BUF_SIZE;
+    samples.push({ p: pingBuf[idx], q: qualBuf[idx] });
+  }
+  const xStep=GW/(vis-1);
+
+  // ── TRACE 1: Ping invertido (ciano) ──
+  for(let pass=0;pass<3;pass++){
+    ctx.beginPath();
+    ctx.lineWidth   = pass===0?6:pass===1?2.5:1.2;
+    ctx.strokeStyle = pass===0?C.g1:pass===1?C.g1b:C.t1;
+    ctx.globalAlpha = pass===0?.3:traceAlpha;
+    for(let i=0;i<samples.length;i++){
+      const x=PL+i*xStep;
+      const y=PT+GH-(samples[i].p/5)*GH;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+
+  // ── TRACE 2: Qualidade (laranja tracejado) ──
+  for(let pass=0;pass<2;pass++){
+    ctx.beginPath();
+    ctx.lineWidth   = pass===0?4:1.5;
+    ctx.strokeStyle = pass===0?C.g2b:C.t2;
+    ctx.globalAlpha = pass===0?.3:traceAlpha*.9;
+    ctx.setLineDash(pass===1?[5,3]:[]);
+    for(let i=0;i<samples.length;i++){
+      const x=PL+i*xStep;
+      const y=PT+GH-(samples[i].q/5)*GH;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.globalAlpha=1;
+
+  // ── Trigger 50% ──
+  if(mode==='trigger'){
+    const ty=PT+GH-(2.5/5)*GH;
+    ctx.strokeStyle=C.trig; ctx.lineWidth=1;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(PL,ty); ctx.lineTo(PL+GW,ty); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=C.trig; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='left';
+    ctx.fillText('TRIG 50%', PL+4, ty-4);
+  }
+
+  // Cursor
+  const curX=PL+GW;
+  ctx.strokeStyle='rgba(0,255,231,.4)'; ctx.lineWidth=1;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(curX,PT); ctx.lineTo(curX,PT+GH); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels topo
+  ctx.fillStyle=C.text; ctx.font='9px "Share Tech Mono"'; ctx.textAlign='left';
+  ctx.fillText(`${Math.round(vis*POLL_MS/COLS)}ms/div · 0–100%`, PL+4, PT-8);
+  ctx.fillStyle=C.t1; ctx.fillText('▬ CH1: Ping', PL+GW-200, PT-8);
+  ctx.fillStyle=C.t2; ctx.fillText('▬ CH2: Qualidade', PL+GW-110, PT-8);
+}
+
+render();
+</script>
+</body>
+</html>
